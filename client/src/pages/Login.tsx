@@ -12,7 +12,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -34,18 +34,22 @@ export default function Login() {
         title: "Welcome back!",
         description: "You have successfully logged in",
       });
-      // Redirect based on role
-      if (email === "admin@edu.com") {
-        setLocation("/admin");
-      } else if (email.includes("teacher")) {
-        setLocation("/teacher");
-      } else {
-        setLocation("/student");
+      
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        if (userData.role === "admin") {
+          setLocation("/admin");
+        } else if (userData.role === "teacher") {
+          setLocation("/teacher");
+        } else {
+          setLocation("/student");
+        }
       }
-    } catch {
+    } catch (error) {
       toast({
-        title: "Error",
-        description: "Invalid credentials",
+        title: "Login failed",
+        description: error instanceof Error ? error.message : "Invalid credentials",
         variant: "destructive",
       });
     } finally {
@@ -62,7 +66,7 @@ export default function Login() {
               <GraduationCap className="h-8 w-8 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Welcome Back</CardTitle>
+          <CardTitle className="text-2xl" data-testid="text-login-title">Welcome Back</CardTitle>
           <CardDescription>
             Sign in to access your dashboard
           </CardDescription>
@@ -115,13 +119,10 @@ export default function Login() {
             </Link>
           </div>
 
-          {/* todo: remove mock functionality - demo credentials */}
           <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-            <p className="text-xs text-muted-foreground text-center mb-2">Demo Credentials</p>
+            <p className="text-xs text-muted-foreground text-center mb-2">Demo Admin Credentials</p>
             <div className="space-y-1 text-xs text-center">
               <p><span className="font-medium">Admin:</span> admin@edu.com / admin123</p>
-              <p><span className="font-medium">Teacher:</span> teacher@edu.com / any</p>
-              <p><span className="font-medium">Student:</span> student@edu.com / any</p>
             </div>
           </div>
         </CardContent>

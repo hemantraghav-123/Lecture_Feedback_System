@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,7 @@ interface AddTeacherModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: { name: string; department: string; subject: string }) => void;
+  isSubmitting?: boolean;
 }
 
 const DEPARTMENTS = [
@@ -31,23 +32,22 @@ const DEPARTMENTS = [
   "Information Technology",
 ];
 
-export function AddTeacherModal({ open, onOpenChange, onSubmit }: AddTeacherModalProps) {
+export function AddTeacherModal({ open, onOpenChange, onSubmit, isSubmitting = false }: AddTeacherModalProps) {
   const [name, setName] = useState("");
   const [department, setDepartment] = useState("");
   const [subject, setSubject] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async () => {
+  useEffect(() => {
+    if (!open) {
+      setName("");
+      setDepartment("");
+      setSubject("");
+    }
+  }, [open]);
+
+  const handleSubmit = () => {
     if (!name || !department || !subject) return;
-
-    setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 500));
     onSubmit({ name, department, subject });
-    setName("");
-    setDepartment("");
-    setSubject("");
-    setIsSubmitting(false);
-    onOpenChange(false);
   };
 
   const handleClose = () => {
@@ -61,7 +61,7 @@ export function AddTeacherModal({ open, onOpenChange, onSubmit }: AddTeacherModa
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add New Teacher</DialogTitle>
+          <DialogTitle data-testid="dialog-title-add-teacher">Add New Teacher</DialogTitle>
           <DialogDescription>
             Enter the teacher's details to add them to the system
           </DialogDescription>
@@ -114,7 +114,7 @@ export function AddTeacherModal({ open, onOpenChange, onSubmit }: AddTeacherModa
           <Button
             onClick={handleSubmit}
             disabled={!name || !department || !subject || isSubmitting}
-            data-testid="button-add-teacher"
+            data-testid="button-submit-add-teacher"
           >
             {isSubmitting ? "Adding..." : "Add Teacher"}
           </Button>

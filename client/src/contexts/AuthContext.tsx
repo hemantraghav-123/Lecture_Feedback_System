@@ -4,12 +4,10 @@ export type UserRole = "student" | "teacher" | "admin";
 
 export interface User {
   id: string;
-  username: string;
   email: string;
   role: UserRole;
   name: string;
   department?: string;
-  subjects?: string[];
 }
 
 interface AuthContextType {
@@ -25,9 +23,8 @@ interface SignupData {
   name: string;
   email: string;
   password: string;
-  role: UserRole;
+  role: "student" | "teacher";
   department?: string;
-  subjects?: string[];
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -37,8 +34,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const token = localStorage.getItem("token");
     const storedUser = localStorage.getItem("user");
-    if (storedUser) {
+    
+    if (token && storedUser) {
       setUser(JSON.parse(storedUser));
     }
     setIsLoading(false);
@@ -46,67 +45,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
-    // todo: remove mock functionality - replace with actual API call
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    
-    // Mock login - check for admin
-    if (email === "admin@edu.com" && password === "admin123") {
-      const adminUser: User = {
-        id: "admin-1",
-        username: "admin",
-        email: "admin@edu.com",
-        role: "admin",
-        name: "Administrator",
-      };
-      setUser(adminUser);
-      localStorage.setItem("user", JSON.stringify(adminUser));
-    } else if (email.includes("teacher")) {
-      const teacherUser: User = {
-        id: "teacher-1",
-        username: "teacher",
-        email,
-        role: "teacher",
-        name: "Dr. John Smith",
-        department: "Computer Science",
-        subjects: ["Web Technology", "Database Systems"],
-      };
-      setUser(teacherUser);
-      localStorage.setItem("user", JSON.stringify(teacherUser));
-    } else {
-      const studentUser: User = {
-        id: "student-1",
-        username: "student",
-        email,
-        role: "student",
-        name: "Alex Johnson",
-      };
-      setUser(studentUser);
-      localStorage.setItem("user", JSON.stringify(studentUser));
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Login failed");
+      }
+
+      const data = await response.json();
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      setUser(data.user);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const signup = async (data: SignupData) => {
     setIsLoading(true);
-    // todo: remove mock functionality - replace with actual API call
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    
-    const newUser: User = {
-      id: `${data.role}-${Date.now()}`,
-      username: data.email.split("@")[0],
-      email: data.email,
-      role: data.role,
-      name: data.name,
-      department: data.department,
-      subjects: data.subjects,
-    };
-    setUser(newUser);
-    localStorage.setItem("user", JSON.stringify(newUser));
-    setIsLoading(false);
+    try {
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "Signup failed");
+      }
+
+      const result = await response.json();
+      localStorage.setItem("token", result.token);
+      localStorage.setItem("user", JSON.stringify(result.user));
+      setUser(result.user);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const logout = () => {
     setUser(null);
+    localStorage.removeItem("token");
     localStorage.removeItem("user");
   };
 

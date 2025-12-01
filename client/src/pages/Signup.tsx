@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { GraduationCap, Loader2 } from "lucide-react";
-import { useAuth, type UserRole } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
 const DEPARTMENTS = [
@@ -28,7 +28,7 @@ export default function Signup() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<UserRole>("student");
+  const [role, setRole] = useState<"student" | "teacher">("student");
   const [department, setDepartment] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { signup } = useAuth();
@@ -41,6 +41,15 @@ export default function Signup() {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters",
         variant: "destructive",
       });
       return;
@@ -69,10 +78,10 @@ export default function Signup() {
         description: "Welcome to EduFeedback",
       });
       setLocation(role === "teacher" ? "/teacher" : "/student");
-    } catch {
+    } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to create account",
+        title: "Signup failed",
+        description: error instanceof Error ? error.message : "Failed to create account",
         variant: "destructive",
       });
     } finally {
@@ -89,7 +98,7 @@ export default function Signup() {
               <GraduationCap className="h-8 w-8 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Create Account</CardTitle>
+          <CardTitle className="text-2xl" data-testid="text-signup-title">Create Account</CardTitle>
           <CardDescription>
             Join EduFeedback to share and receive feedback
           </CardDescription>
@@ -124,7 +133,7 @@ export default function Signup() {
               <Input
                 id="password"
                 type="password"
-                placeholder="Create a strong password"
+                placeholder="Create a strong password (min 6 chars)"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 data-testid="input-password"
@@ -135,7 +144,7 @@ export default function Signup() {
               <Label>I am a</Label>
               <RadioGroup
                 value={role}
-                onValueChange={(val) => setRole(val as UserRole)}
+                onValueChange={(val) => setRole(val as "student" | "teacher")}
                 className="flex gap-4"
               >
                 <div className="flex items-center space-x-2">

@@ -27,38 +27,68 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Users, MessageSquare, Star, Trash2, Plus, GraduationCap } from "lucide-react";
-
-interface Teacher {
-  id: string;
-  name: string;
-  department: string;
-  subject: string;
-  averageRating: number;
-  totalFeedback: number;
-}
-
-// todo: remove mock functionality - replace with API data
-const INITIAL_TEACHERS: Teacher[] = [
-  { id: "1", name: "Shweta Kaushik", department: "Computer Science", subject: "Web Technology", averageRating: 4.5, totalFeedback: 42 },
-  { id: "2", name: "Tripti Pandey", department: "Computer Science", subject: "Machine Learning Techniques", averageRating: 4.7, totalFeedback: 38 },
-  { id: "3", name: "Ayush Aggarwal", department: "Computer Science", subject: "DBMS", averageRating: 4.3, totalFeedback: 35 },
-  { id: "4", name: "Shaili Gupta", department: "Computer Science", subject: "OOSD", averageRating: 4.6, totalFeedback: 29 },
-  { id: "5", name: "Shalini Singh", department: "Computer Science", subject: "DAA", averageRating: 4.4, totalFeedback: 33 },
-  { id: "6", name: "Bharat Bhardwaj", department: "Computer Science", subject: "COA", averageRating: 4.2, totalFeedback: 27 },
-  { id: "7", name: "Sanjeev Soni", department: "Computer Science", subject: "FSD", averageRating: 4.8, totalFeedback: 45 },
-  { id: "8", name: "Pratik Singh", department: "Computer Science", subject: "DSA", averageRating: 4.5, totalFeedback: 40 },
-  { id: "9", name: "Meenakshi Vishnoi", department: "Computer Science", subject: "OOPs with Java", averageRating: 4.4, totalFeedback: 31 },
-];
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { Teacher } from "@shared/schema";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AdminPanel() {
   const { toast } = useToast();
-  const [teachers, setTeachers] = useState<Teacher[]>(INITIAL_TEACHERS);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("name-asc");
   const [selectedDepartment, setSelectedDepartment] = useState("all");
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
+
+  const { data: teachers = [], isLoading } = useQuery<Teacher[]>({
+    queryKey: ["/api/teachers"],
+  });
+
+  const addTeacherMutation = useMutation({
+    mutationFn: async (data: { name: string; department: string; subject: string }) => {
+      const res = await apiRequest("POST", "/api/teachers", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/teachers"] });
+      setAddModalOpen(false);
+      toast({
+        title: "Teacher added",
+        description: "New teacher has been added successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to add teacher",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTeacherMutation = useMutation({
+    mutationFn: async (teacherId: string) => {
+      const res = await apiRequest("DELETE", `/api/teachers/${teacherId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/teachers"] });
+      setDeleteDialogOpen(false);
+      setTeacherToDelete(null);
+      toast({
+        title: "Teacher removed",
+        description: "Teacher has been removed from the system.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to remove teacher",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const departments = useMemo(() => 
     Array.from(new Set(teachers.map((t) => t.department))),
@@ -68,7 +98,6 @@ export default function AdminPanel() {
   const filteredTeachers = useMemo(() => {
     let result = [...teachers];
 
-    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter(
@@ -78,12 +107,10 @@ export default function AdminPanel() {
       );
     }
 
-    // Department filter
     if (selectedDepartment && selectedDepartment !== "all") {
       result = result.filter((t) => t.department === selectedDepartment);
     }
 
-    // Sort
     result.sort((a, b) => {
       switch (sortBy) {
         case "name-asc":
@@ -91,11 +118,11 @@ export default function AdminPanel() {
         case "name-desc":
           return b.name.localeCompare(a.name);
         case "rating-high":
-          return b.averageRating - a.averageRating;
+          return (b.averageRating || 0) - (a.averageRating || 0);
         case "rating-low":
-          return a.averageRating - b.averageRating;
+          return (a.averageRating || 0) - (b.averageRating || 0);
         case "feedback-most":
-          return b.totalFeedback - a.totalFeedback;
+          return (b.totalFeedback || 0) - (a.totalFeedback || 0);
         default:
           return 0;
       }
@@ -104,23 +131,13 @@ export default function AdminPanel() {
     return result;
   }, [teachers, searchQuery, sortBy, selectedDepartment]);
 
-  const totalFeedback = teachers.reduce((sum, t) => sum + t.totalFeedback, 0);
-  const averageRating = teachers.reduce((sum, t) => sum + t.averageRating, 0) / teachers.length;
+  const totalFeedback = teachers.reduce((sum, t) => sum + (t.totalFeedback || 0), 0);
+  const averageRating = teachers.length > 0 
+    ? teachers.reduce((sum, t) => sum + (t.averageRating || 0), 0) / teachers.length 
+    : 0;
 
   const handleAddTeacher = (data: { name: string; department: string; subject: string }) => {
-    const newTeacher: Teacher = {
-      id: `teacher-${Date.now()}`,
-      name: data.name,
-      department: data.department,
-      subject: data.subject,
-      averageRating: 0,
-      totalFeedback: 0,
-    };
-    setTeachers((prev) => [...prev, newTeacher]);
-    toast({
-      title: "Teacher added",
-      description: `${data.name} has been added successfully.`,
-    });
+    addTeacherMutation.mutate(data);
   };
 
   const handleDeleteClick = (teacher: Teacher) => {
@@ -130,23 +147,35 @@ export default function AdminPanel() {
 
   const handleConfirmDelete = () => {
     if (teacherToDelete) {
-      setTeachers((prev) => prev.filter((t) => t.id !== teacherToDelete.id));
-      toast({
-        title: "Teacher removed",
-        description: `${teacherToDelete.name} has been removed from the system.`,
-      });
+      deleteTeacherMutation.mutate(teacherToDelete.id);
     }
-    setDeleteDialogOpen(false);
-    setTeacherToDelete(null);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] bg-background">
+        <div className="container px-4 md:px-6 py-8">
+          <div className="mb-8">
+            <Skeleton className="h-9 w-48 mb-2" />
+            <Skeleton className="h-5 w-64" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-32" />
+            ))}
+          </div>
+          <Skeleton className="h-96" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-background">
       <div className="container px-4 md:px-6 py-8">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+            <h1 className="text-3xl font-bold" data-testid="text-admin-title">Admin Dashboard</h1>
             <p className="text-muted-foreground mt-1">
               Manage teachers and monitor feedback
             </p>
@@ -157,7 +186,6 @@ export default function AdminPanel() {
           </Button>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <StatCard
             title="Total Teachers"
@@ -185,7 +213,6 @@ export default function AdminPanel() {
           />
         </div>
 
-        {/* Search and Filter */}
         <div className="mb-6">
           <SearchFilter
             searchQuery={searchQuery}
@@ -199,7 +226,6 @@ export default function AdminPanel() {
           />
         </div>
 
-        {/* Teachers Table */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg font-medium">Teachers</CardTitle>
@@ -227,7 +253,7 @@ export default function AdminPanel() {
                               {teacher.name.split(" ").map((n) => n[0]).join("")}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="font-medium">{teacher.name}</span>
+                          <span className="font-medium" data-testid={`text-teacher-name-${teacher.id}`}>{teacher.name}</span>
                         </div>
                       </TableCell>
                       <TableCell>{teacher.subject}</TableCell>
@@ -235,9 +261,9 @@ export default function AdminPanel() {
                         <Badge variant="secondary">{teacher.department}</Badge>
                       </TableCell>
                       <TableCell>
-                        <StarRating rating={teacher.averageRating} size="sm" showValue />
+                        <StarRating rating={teacher.averageRating || 0} size="sm" showValue />
                       </TableCell>
-                      <TableCell className="text-center">{teacher.totalFeedback}</TableCell>
+                      <TableCell className="text-center">{teacher.totalFeedback || 0}</TableCell>
                       <TableCell className="text-right">
                         <Button
                           variant="ghost"
@@ -257,26 +283,25 @@ export default function AdminPanel() {
 
             {filteredTeachers.length === 0 && (
               <div className="text-center py-8">
-                <p className="text-muted-foreground">No teachers found matching your criteria.</p>
+                <p className="text-muted-foreground" data-testid="text-no-teachers">No teachers found matching your criteria.</p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Add Teacher Modal */}
         <AddTeacherModal
           open={addModalOpen}
           onOpenChange={setAddModalOpen}
           onSubmit={handleAddTeacher}
+          isSubmitting={addTeacherMutation.isPending}
         />
 
-        {/* Delete Confirmation Dialog */}
         <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Remove Teacher</AlertDialogTitle>
+              <AlertDialogTitle data-testid="dialog-title-delete">Remove Teacher</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to remove {teacherToDelete?.name} from the system? This action cannot be undone.
+                Are you sure you want to remove {teacherToDelete?.name} from the system? This action cannot be undone and will also delete all associated feedback.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -285,8 +310,9 @@ export default function AdminPanel() {
                 onClick={handleConfirmDelete}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 data-testid="button-confirm-delete"
+                disabled={deleteTeacherMutation.isPending}
               >
-                Remove
+                {deleteTeacherMutation.isPending ? "Removing..." : "Remove"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

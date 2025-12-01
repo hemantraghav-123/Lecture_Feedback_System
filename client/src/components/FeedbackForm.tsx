@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,32 +11,39 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { StarRating } from "./StarRating";
-import { type Teacher } from "./TeacherCard";
 import { BookOpen } from "lucide-react";
 
+export interface TeacherData {
+  id: string;
+  name: string;
+  department: string;
+  subject: string;
+  averageRating: number;
+  totalFeedback: number;
+}
+
 interface FeedbackFormProps {
-  teacher: Teacher | null;
+  teacher: TeacherData | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (teacherId: string, rating: number, comment: string) => void;
+  isSubmitting?: boolean;
 }
 
-export function FeedbackForm({ teacher, open, onOpenChange, onSubmit }: FeedbackFormProps) {
+export function FeedbackForm({ teacher, open, onOpenChange, onSubmit, isSubmitting = false }: FeedbackFormProps) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async () => {
+  useEffect(() => {
+    if (!open) {
+      setRating(0);
+      setComment("");
+    }
+  }, [open]);
+
+  const handleSubmit = () => {
     if (!teacher || rating === 0) return;
-    
-    setIsSubmitting(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 500));
     onSubmit(teacher.id, rating, comment);
-    setRating(0);
-    setComment("");
-    setIsSubmitting(false);
-    onOpenChange(false);
   };
 
   const handleClose = () => {
@@ -51,7 +58,7 @@ export function FeedbackForm({ teacher, open, onOpenChange, onSubmit }: Feedback
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Submit Feedback</DialogTitle>
+          <DialogTitle data-testid="dialog-title-feedback">Submit Feedback</DialogTitle>
           <DialogDescription>
             Share your experience with this course
           </DialogDescription>
@@ -59,7 +66,7 @@ export function FeedbackForm({ teacher, open, onOpenChange, onSubmit }: Feedback
 
         <div className="bg-muted/50 rounded-lg p-4 space-y-2">
           <div className="flex items-center justify-between">
-            <span className="font-medium">{teacher.name}</span>
+            <span className="font-medium" data-testid="text-teacher-feedback-name">{teacher.name}</span>
             <Badge variant="secondary">{teacher.department}</Badge>
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -80,7 +87,7 @@ export function FeedbackForm({ teacher, open, onOpenChange, onSubmit }: Feedback
               />
             </div>
             {rating > 0 && (
-              <p className="text-center text-sm text-muted-foreground">
+              <p className="text-center text-sm text-muted-foreground" data-testid="text-rating-label">
                 {rating === 1 && "Poor"}
                 {rating === 2 && "Fair"}
                 {rating === 3 && "Good"}
